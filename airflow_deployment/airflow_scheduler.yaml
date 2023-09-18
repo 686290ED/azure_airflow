@@ -1,0 +1,123 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airflow-scheduler
+  namespace: airflow
+  labels:
+    instance: airflow-aks
+    executor: CeleryExecutor
+    component: scheduler
+    part-of: airflow  
+    azure.workload.identity/use: "true"    
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: airflow-scheduler
+      version: "1.0.0"
+      component: scheduler
+      part-of: airflow
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+  template:
+    metadata:
+      labels:
+        name: airflow-scheduler
+        version: "1.0.0"
+        component: scheduler
+        part-of: airflow
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - airflow-scheduler
+            topologyKey: "kubernetes.io/hostname"
+      serviceAccountName: "airflow-keyvault"
+      volumes:
+        - name: az-dags
+          persistentVolumeClaim:
+            claimName: azure-claim-dags
+        - name: az-logs
+          persistentVolumeClaim:
+            claimName: azure-claim-logs
+        - name: secrets-airflow
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "keyvault-sync"
+      containers:
+        - name: airflow
+          image: acr0023.azurecr.io/apache/airflow:latest
+          imagePullPolicy: Always
+          command: ["/bin/sh", "-c"]
+          args: 
+            - airflow db init;
+              airflow users create --username admin --password 593535868 --firstname Zhen --lastname Guo --role Admin --email guo.zhen12@hotmail.com;
+              airflow scheduler -D;
+          volumeMounts:
+            - name: az-dags
+              mountPath: /opt/airflow/dags
+            - name: az-logs
+              mountPath: /opt/airflow/logs
+            - name: secrets-airflow
+              mountPath: "/mnt/secrets-store"
+              readOnly: true
+          envFrom:
+          - configMapRef:
+              name: airflow-configmap
+          env:
+          - name: AIRFLOW__CORE__FERNET_KEY
+            valueFrom:
+              secretKeyRef:
+                name: aks-airflow-secret 
+                key: airflow-fernet-key
+          - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
+            valueFrom:
+              secretKeyRef:
+                name: aks-airflow-secret 
+                key: airflow-sql-database 
+          - name: AIRFLOW__WEBSERVER__SECRET_KEY
+            valueFrom:
+              secretKeyRef:
+                name: aks-airflow-secret 
+                key: airflow-webserver-secret-key
+          - name: AIRFLOW__CELERY__BROKER_URL
+            valueFrom:
+              secretKeyRef:
+                name: aks-airflow-secret 
+                key: airflow-broker-url
+          - name: AIRFLOW__CELERY__RESULT_BACKEND
+            valueFrom:
+              secretKeyRef:
+                name: aks-airflow-secret 
+                key: airflow-celery-result-backend
+          resources:
+            requests:
+              cpu: 0.3
+              memory: 2Gi
+            limits:
+              cpu: 1
+              memory: 5Gi
+          livenessProbe:
+            exec:
+              command: 
+              - sh
+              - -c
+              - |
+                CONNECTION_CHECK_MAX_COUNT=0 AIRFLOW__LOGGING__LOGGING_LEVEL=ERROR exec /entrypoint \
+                airflow jobs check --job-type SchedulerJob --local
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 15
+            failureThreshold: 5
+            successThreshold: 1
+             

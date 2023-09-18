@@ -1,0 +1,19 @@
+#From the docs ConfigMap.data is a string:string map
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: airflow-configmap
+  namespace: airflow
+data:
+  # Reference: https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html
+  AIRFLOW__CORE__EXECUTOR: "CeleryExecutor"
+  AIRFLOW__CORE__MIN_SERIALIZED_DAG_FETCH_INTERVAL: "30"
+  AIRFLOW__CORE__DAEMON_UMASK: "0o022"
+  AIRFLOW__CORE__MAX_ACTIVE_RUNS_PER_DAG: "3"
+  AIRFLOW__LOGGING__LOGGING_LEVEL: "INFO"
+  AIRFLOW__SMTP__SMTP_HOST: "smtp.office365.com"
+  AIRFLOW__SMTP__SMTP_STARTTLS: "True"
+  AIRFLOW__SMTP__SMTP_MAIL_FROM: ""
+  AIRFLOW__SMTP__SMTP_PASSWORD: ""
+  AIRFLOW__WEBSERVER__DAG_DEFAULT_VIEW: "graph"
+  

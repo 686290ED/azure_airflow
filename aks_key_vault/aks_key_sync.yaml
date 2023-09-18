@@ -1,0 +1,44 @@
+apiVersion: secrets-store.csi.x-k8s.io/v1
+kind: SecretProviderClass
+metadata:
+  name: keyvault-sync
+  namespace: airflow
+spec:
+  provider: azure                             
+  secretObjects:                              # [OPTIONAL] SecretObjects defines the desired state of synced Kubernetes secret objects
+  - data:
+    - key: airflow-fernet-key                           # data field to populate
+      objectName: airflow-fernet-key                        # name of the mounted content to sync; this could be the object name or the object alias
+    - key: airflow-sql-database                        # data field to populate
+      objectName: airflow-sql-database    
+    - key: airflow-webserver-secret-key                        # data field to populate
+      objectName: airflow-webserver-secret-key         
+    - key: airflow-broker-url                      # data field to populate
+      objectName: airflow-broker-url    
+    - key: airflow-celery-result-backend
+      objectName: airflow-celery-result-backend
+    secretName: aks-airflow-secret                     # name of the Kubernetes secret object
+    type: Opaque   
+  parameters:
+    usePodIdentity: "false"
+    useVMManagedIdentity: "true"
+    userAssignedIdentityID: "18dc7fb6-2260-434f-8f23-7cdaab27cb9f" #identityProfile.kubeletidentity.clientId
+    keyvaultName: aks-airflow-key-0024
+    objects: |
+      array:
+        - |
+          objectName: airflow-fernet-key
+          objectType: secret
+        - |
+          objectName: airflow-sql-database
+          objectType: secret
+        - |
+          objectName: airflow-webserver-secret-key
+          objectType: secret
+        - |
+          objectName: airflow-broker-url
+          objectType: secret
+        - |
+          objectName: airflow-celery-result-backend
+          objectType: secret
+    tenantId: 3196a18d-1c35-498a-b779-a082d45d2ab5

@@ -1,0 +1,159 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airflow-webserver
+  namespace: airflow
+  labels:
+    instance: airflow-aks
+    executor: CeleryExecutor
+    component: webserver
+    part-of: airflow   
+    azure.workload.identity/use: "true"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: airflow-webserver
+      version: "1.0.0"
+      component: webserver
+      part-of: airflow
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 100%
+      maxUnavailable: 0
+  template:
+    metadata:
+      name: airflow-webserver
+      labels:
+        name: airflow-webserver
+        version: "1.0.0"
+        component: webserver
+        part-of: airflow
+    spec:
+      hostname: airflow-webserver
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - airflow-webserver
+            topologyKey: "kubernetes.io/hostname"
+      serviceAccountName: "airflow-keyvault"
+      volumes:
+        - name: az-dags
+          persistentVolumeClaim:
+            claimName: azure-claim-dags
+        - name: az-logs
+          persistentVolumeClaim:
+            claimName: azure-claim-logs
+        - name: secrets-airflow
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "keyvault-sync" 
+      containers:
+        - name: airflow
+          image: acr0023.azurecr.io/apache/airflow:latest
+          imagePullPolicy: Always
+          command: 
+            - "/bin/sh"
+          args: 
+            - "-c"
+            - airflow webserver --port 8080 -D;
+          volumeMounts:
+            - name: az-dags
+              mountPath: /opt/airflow/dags
+            - name: az-logs
+              mountPath: /opt/airflow/logs
+            - name: secrets-airflow
+              mountPath: /mnt/secrets-store
+              readOnly: true
+          envFrom:
+            - configMapRef:
+                name: airflow-configmap
+          env:
+          - name: AIRFLOW__CORE__FERNET_KEY
+            valueFrom:
+              secretKeyRef:
+                name: aks-airflow-secret 
+                key: airflow-fernet-key
+          - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
+            valueFrom:
+              secretKeyRef:
+                name: aks-airflow-secret 
+                key: airflow-sql-database 
+          - name: AIRFLOW__WEBSERVER__SECRET_KEY
+            valueFrom:
+              secretKeyRef:
+                name: aks-airflow-secret 
+                key: airflow-webserver-secret-key
+          - name: AIRFLOW__CELERY__BROKER_URL
+            valueFrom:
+              secretKeyRef:
+                name: aks-airflow-secret 
+                key: airflow-broker-url
+          - name: AIRFLOW__CELERY__RESULT_BACKEND
+            valueFrom:
+              secretKeyRef:
+                name: aks-airflow-secret 
+                key: airflow-celery-result-backend
+          resources:
+            requests:
+              cpu: 0.1
+              memory: 1Gi
+            limits:
+              cpu: 0.3
+              memory: 5Gi
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: celery
+              containerPort: 5555
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 240
+            periodSeconds: 30
+            timeoutSeconds: 15
+            failureThreshold: 5
+            successThreshold: 1
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 240
+            periodSeconds: 30
+            timeoutSeconds: 15
+            failureThreshold: 5
+            successThreshold: 1    
+---
+# kubectl expose is a synonym for this stanza
+apiVersion: v1
+kind: Service
+metadata:
+  name: airflow-webserver-service
+  namespace: airflow
+  labels:
+    name: airflow-webserver-service
+    component: webserver
+    part-of: airflow
+spec:
+  type: LoadBalancer
+  selector:
+    name: airflow-webserver
+    version: "1.0.0"
+    component: webserver
+    part-of: airflow
+  ports:
+    - name: airflow-ui
+      protocol: TCP
+      port: 8080
+      targetPort: 8080
