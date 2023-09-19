@@ -1,4 +1,4 @@
-#Airflow deployment on AKS
+# Airflow deployment on AKS
 This practice is to deploy a customized image of airflow on AKS. The deployment has following features.
 1) The airflow image can be updated in a github repo and deployed in Azure Pipelines (update later). 
 2) The deployment uses Azure AD and Kubernetes RBAC for clusters and AD workload identity for application to access the key vault.
