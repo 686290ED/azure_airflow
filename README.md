@@ -1,10 +1,9 @@
 # Airflow deployment on AKS
-This practice is to deploy a customized image of Airflow on AKS. The deployment has following features.
-1) The Airflow image can be updated in a github repo and deployed in Azure Pipelines (to be updated). 
-2) The deployment uses Azure AD and Kubernetes RBAC for clusters and AD workload identity for application to access the key vault.
-3) The Airflow database and celery backend use Azure Database for PostgreSQL - Flexible Server and Azure Cache for Redis.
-4) Secrets are saved in Azure Key Vault with RBAC.
-5) Airflow dags and logs are stored in Azure files.
+This practice is to deploy a customized image of Airflow on AKS. The deployment has following features. 
+1) The deployment uses Azure AD and Kubernetes RBAC for clusters and AD workload identity for application to access the key vault.
+2) The Airflow database and celery backend use Azure Database for PostgreSQL - Flexible Server and Azure Cache for Redis.
+3) Secrets are saved in Azure Key Vault with RBAC.
+4) Airflow dags and logs are stored in Azure files.
 
 ## Steps
 ### 1) Create an AKS cluster with managed identity.
